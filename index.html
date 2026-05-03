@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal AI - Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { gemini: { 50: '#f0f4f8', 100: '#e1e8f0', 800: '#1e293b', 900: '#0f172a' } } } }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .prose pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        .modal-animate { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 antialiased transition-colors">
+
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex items-center justify-center p-4">
+        <div class="w-full max-w-md space-y-6 bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700">
+            <div class="text-center">
+                <h2 id="auth-title" class="text-3xl font-bold text-blue-600">Create Account</h2>
+                <p id="auth-subtitle" class="text-gray-500 mt-2">The first user registered will be Admin.</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="auth-user" placeholder="Username" class="w-full p-3 rounded-xl border dark:bg-gray-900 dark:border-gray-600 outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="auth-pass" placeholder="Password" class="w-full p-3 rounded-xl border dark:bg-gray-900 dark:border-gray-600 outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="handleAuth()" id="auth-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl font-bold transition-all">Sign Up / Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App (Hidden until Auth) -->
+    <div id="app" class="hidden flex h-[100dvh] w-full overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-72 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col hidden md:flex">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex flex-col gap-2">
+                <button onclick="createNewChat()" class="w-full bg-blue-600 text-white p-3 rounded-2xl font-medium shadow-lg hover:bg-blue-700 transition-all">+ New Chat</button>
+                <button onclick="openImageCreator()" class="w-full bg-purple-600 text-white p-3 rounded-2xl font-medium shadow-lg hover:bg-purple-700 transition-all">🎨 Create Image</button>
+            </div>
+            <div id="chat-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+            <div class="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                <div id="user-badge" class="text-xs font-bold uppercase tracking-wider text-gray-400 px-2"></div>
+                <button id="admin-nav" onclick="openAdminPanel()" class="hidden w-full flex items-center gap-2 p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all">🛠 Admin Panel</button>
+                <button onclick="openSettings()" class="w-full flex items-center gap-2 p-3 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-xl transition-all">⚙️ Settings</button>
+                <button onclick="logout()" class="w-full flex items-center gap-2 p-3 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-xl transition-all">🚪 Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900">
+            <header class="h-14 flex items-center justify-between px-4 border-b dark:border-gray-800">
+                <button class="md:hidden" onclick="toggleMobileSidebar()">☰</button>
+                <span id="header-title" class="font-semibold text-gray-500 text-sm">Universal AI Interface</span>
+                <button onclick="toggleDarkMode()">🌓</button>
+            </header>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6"></div>
+
+            <div class="p-4 bg-gradient-to-t from-white dark:from-gray-900">
+                <div class="max-w-4xl mx-auto flex items-end gap-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-3xl p-2 shadow-2xl">
+                    <textarea id="message-input" rows="1" class="w-full bg-transparent p-3 outline-none resize-none" placeholder="Message Universal AI..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+                    <button id="send-btn" onclick="sendMessage()" class="bg-blue-600 text-white p-4 rounded-2xl hover:scale-105 transition-transform">🚀</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <dialog id="admin-modal" class="bg-transparent m-auto p-4 w-full max-w-2xl">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border dark:border-gray-700 p-6 modal-animate">
+            <h2 class="text-2xl font-bold mb-4 text-red-600">Admin Control Panel</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead><tr class="border-b dark:border-gray-700"><th class="pb-2">User</th><th class="pb-2">Role</th><th class="pb-2">Action</th></tr></thead>
+                    <tbody id="admin-user-table"></tbody>
+                </table>
+            </div>
+            <div class="mt-6 flex justify-end"><button onclick="this.closest('dialog').close()" class="px-6 py-2 bg-gray-200 dark:bg-gray-700 rounded-xl">Close</button></div>
+        </div>
+    </dialog>
+
+    <dialog id="image-modal" class="bg-transparent m-auto p-4 w-full max-w-lg">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border dark:border-gray-700 p-6 modal-animate">
+            <h2 class="text-2xl font-bold mb-4">Image Creator</h2>
+            <div class="space-y-4">
+                <select id="img-model" class="w-full p-3 rounded-xl border dark:bg-gray-900 dark:border-gray-700 outline-none">
+                    <option value="nano-banana-2">Nano Banana 2 (Gemini 3 Flash)</option>
+                    <option value="veo-3">Veo 3 (Ultra HD)</option>
+                    <option value="veo-2">Veo 2 (Standard)</option>
+                    <option value="veo-ultra">Veo Ultra (Cinematic)</option>
+                </select>
+                <textarea id="img-prompt" placeholder="Describe the image you want..." class="w-full p-3 h-32 rounded-xl border dark:bg-gray-900 dark:border-gray-700 outline-none"></textarea>
+                <button onclick="generateImage()" id="gen-img-btn" class="w-full bg-purple-600 text-white p-3 rounded-xl font-bold hover:bg-purple-700 transition-all">Generate Free</button>
+                <div id="image-result" class="mt-4 rounded-2xl overflow-hidden hidden"></div>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="settings-modal" class="bg-transparent m-auto p-4 w-full max-w-md">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border dark:border-gray-700 p-6 modal-animate">
+            <h3 class="font-bold mb-4">Settings</h3>
+            <div class="space-y-4">
+                <div><label class="text-xs text-gray-400">OpenRouter API Key</label><input type="password" id="api-key" class="w-full p-2 border rounded-lg dark:bg-gray-900 dark:border-gray-700"></div>
+                <div><label class="text-xs text-gray-400">Model ID</label><input type="text" id="model-id" value="deepseek/deepseek-r1:free" class="w-full p-2 border rounded-lg dark:bg-gray-900 dark:border-gray-700"></div>
+                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white p-2 rounded-xl font-bold">Save Changes</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+        // --- Core Data ---
+        let currentUser = null;
+        let users = JSON.parse(localStorage.getItem('app_users') || '[]');
+        let chats = JSON.parse(localStorage.getItem('app_chats') || '[]');
+        let currentChatId = null;
+
+        // --- Auth Logic ---
+        function handleAuth() {
+            const user = document.getElementById('auth-user').value.trim();
+            const pass = document.getElementById('auth-pass').value.trim();
+            if (!user || !pass) return alert("Fields cannot be empty");
+
+            const existing = users.find(u => u.username === user);
+            if (existing) {
+                if (existing.password === pass) {
+                    login(existing);
+                } else {
+                    alert("Wrong password");
+                }
+            } else {
+                const newUser = { 
+                    username: user, 
+                    password: pass, 
+                    role: users.length === 0 ? 'admin' : 'user' 
+                };
+                users.push(newUser);
+                localStorage.setItem('app_users', JSON.stringify(users));
+                login(newUser);
+            }
+        }
+
+        function login(user) {
+            currentUser = user;
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('user-badge').textContent = `Logged as: ${user.username} (${user.role})`;
+            if (user.role === 'admin') document.getElementById('admin-nav').classList.remove('hidden');
+            
+            loadSettings();
+            initChats();
+        }
+
+        function logout() { location.reload(); }
+
+        // --- Admin Logic ---
+        function openAdminPanel() {
+            if (currentUser.role !== 'admin') return;
+            const table = document.getElementById('admin-user-table');
+            table.innerHTML = users.map(u => `
+                <tr class="border-b dark:border-gray-800">
+                    <td class="py-2">${u.username}</td>
+                    <td class="py-2">${u.role}</td>
+                    <td class="py-2"><button onclick="deleteUser('${u.username}')" class="text-red-500">Delete</button></td>
+                </tr>
+            `).join('');
+            document.getElementById('admin-modal').showModal();
+        }
+
+        function deleteUser(username) {
+            if (username === currentUser.username) return alert("Cannot delete yourself");
+            users = users.filter(u => u.username !== username);
+            localStorage.setItem('app_users', JSON.stringify(users));
+            openAdminPanel();
+        }
+
+        // --- Image Creation ---
+        function openImageCreator() { document.getElementById('image-modal').showModal(); }
+
+        async function generateImage() {
+            const prompt = document.getElementById('img-prompt').value;
+            const model = document.getElementById('img-model').value;
+            const btn = document.getElementById('gen-img-btn');
+            const resultDiv = document.getElementById('image-result');
+
+            if (!prompt) return alert("Enter a prompt");
+            
+            btn.disabled = true;
+            btn.textContent = "Generating...";
+            
+            // Simulating AI Image Generation (Using placeholder for UI visualization)
+            // In a real environment, this calls the Gemini 3 Flash Image (Nano Banana 2) API
+            setTimeout(() => {
+                const imgUrl = `https://pollinations.ai/p/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux`;
+                resultDiv.innerHTML = `<img src="${imgUrl}" class="w-full h-auto rounded-xl shadow-lg cursor-pointer" onclick="window.open(this.src)">`;
+                resultDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = "Generate Another Free";
+            }, 2000);
+        }
+
+        // --- Chat Logic ---
+        function initChats() {
+            const userChats = chats.filter(c => c.owner === currentUser.username);
+            if (userChats.length === 0) createNewChat();
+            else switchChat(userChats[0].id);
+            renderChatList();
+        }
+
+        function createNewChat() {
+            const newId = Date.now().toString();
+            const newChat = { id: newId, title: "New Conversation", messages: [], owner: currentUser.username };
+            chats.unshift(newChat);
+            currentChatId = newId;
+            saveData();
+            renderChatList();
+            renderMessages();
+        }
+
+        function switchChat(id) {
+            currentChatId = id;
+            renderChatList();
+            renderMessages();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            const apiKey = localStorage.getItem('api_key');
+            const model = localStorage.getItem('model_id') || 'deepseek/deepseek-r1:free';
+
+            if (!text || !apiKey) return alert("Check API Key or Message");
+
+            const chat = chats.find(c => c.id === currentChatId);
+            chat.messages.push({ role: 'user', content: text });
+            if (chat.title === "New Conversation") chat.title = text.substring(0, 20);
+            
+            input.value = '';
+            input.style.height = 'auto';
+            renderMessages();
+
+            try {
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model: model, messages: chat.messages })
+                });
+                const data = await response.json();
+                const reply = data.choices[0].message.content;
+                chat.messages.push({ role: 'assistant', content: reply });
+            } catch (e) {
+                chat.messages.push({ role: 'assistant', content: "Error connecting to AI. Check API Key." });
+            }
+
+            saveData();
+            renderMessages();
+            renderChatList();
+        }
+
+        // --- UI Utilities ---
+        function renderMessages() {
+            const container = document.getElementById('chat-messages');
+            const chat = chats.find(c => c.id === currentChatId);
+            container.innerHTML = chat.messages.map(m => `
+                <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn">
+                    <div class="max-w-[85%] p-4 rounded-3xl ${m.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-gray-100 dark:bg-gray-800 prose dark:prose-invert rounded-tl-none shadow-sm'}">
+                        ${marked.parse(m.content)}
+                    </div>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderChatList() {
+            const container = document.getElementById('chat-list');
+            const userChats = chats.filter(c => c.owner === currentUser.username);
+            container.innerHTML = userChats.map(c => `
+                <div onclick="switchChat('${c.id}')" class="p-3 rounded-xl cursor-pointer truncate text-sm ${c.id === currentChatId ? 'bg-blue-50 text-blue-600 font-bold dark:bg-blue-900/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500'}">
+                    # ${c.title}
+                </div>
+            `).join('');
+        }
+
+        function saveData() { localStorage.setItem('app_chats', JSON.stringify(chats)); }
+        function loadSettings() {
+            document.getElementById('api-key').value = localStorage.getItem('api_key') || '';
+            document.getElementById('model-id').value = localStorage.getItem('model_id') || 'deepseek/deepseek-r1:free';
+        }
+        function saveSettings() {
+            localStorage.setItem('api_key', document.getElementById('api-key').value);
+            localStorage.setItem('model_id', document.getElementById('model-id').value);
+            document.getElementById('settings-modal').close();
+        }
+        function openSettings() { document.getElementById('settings-modal').showModal(); }
+        function toggleDarkMode() { document.documentElement.classList.toggle('dark'); }
+
+    </script>
+</body>
+</html>
